@@ -13,14 +13,17 @@ public static class HostApplicationBuilderExtensions {
 	/// <summary>
 	/// Register Service Provider.
 	/// </summary>
-	/// <typeparam name="TRegistrar"></typeparam>
-	/// <typeparam name="TSettings"></typeparam>
-	/// <typeparam name="TInstanceSettings"></typeparam>
-	/// <typeparam name="THealthOptions"></typeparam>
-	/// <param name="builder"></param>
-	/// <returns></returns>
+	/// <typeparam name="TRegistrar">The registrar type.</typeparam>
+	/// <typeparam name="TSettings">The settings type.</typeparam>
+	/// <typeparam name="TInstanceSettings">The instance settings type.</typeparam>
+	/// <typeparam name="THealthOptions">The health options type.</typeparam>
+	/// <param name="builder">The host application builder.</param>
+	/// <param name="required">If true, throws an exception when configuration is missing. Default is false.</param>
+	/// <returns>The host application builder for chaining.</returns>
+	/// <exception cref="InvalidOperationException">Thrown when required is true and configuration is missing or invalid.</exception>
 	public static IHostApplicationBuilder RegisterServiceProvider<TRegistrar, TSettings, TInstanceSettings, THealthOptions>(
-		this IHostApplicationBuilder builder)
+		this IHostApplicationBuilder builder,
+		bool required = false)
 		where TRegistrar : ServiceProviderRegistrar<TSettings, TInstanceSettings, THealthOptions>, new()
 		where TSettings : ServiceProviderSettings<TInstanceSettings, THealthOptions>
 		where TInstanceSettings : ServiceProviderInstanceSettings<THealthOptions>
@@ -29,7 +32,7 @@ public static class HostApplicationBuilderExtensions {
 		var registrarName = typeof(TRegistrar).Name;
 		var deferredLogger = Logger.CreateDeferredLogger();
 
-		using (var loggingScope = deferredLogger.BeginScope($"Registrar {registrarName}")) {
+		using (var loggingScope = deferredLogger.BeginScope($"Registrar '{registrarName}'")) {
 
 			// Check if this specific registrar type is already registered
 			if (builder.Services.IsMarkerTypeRegistered<TRegistrar>()) {
@@ -44,7 +47,15 @@ public static class HostApplicationBuilderExtensions {
 			var providerSectionKey = GetProviderConfigPath(registrar.ProviderType, registrar.ProviderName);
 			var providerSection = builder.Configuration.GetSection(providerSectionKey);
 			if (!providerSection.Exists()) {
-				deferredLogger.LogWarning($"No configuration settings found for '{registrarName}'.");
+				if (required) {
+					throw new InvalidOperationException(
+						$"Configuration required but not found for '{registrarName}' at '{providerSectionKey}'.");
+				}
+
+				deferredLogger.LogDebug(
+					"Skipping '{registrarName}' - no configuration found at '{configPath}'.",
+					registrarName,
+					providerSectionKey);
 				return builder;
 			}
 
