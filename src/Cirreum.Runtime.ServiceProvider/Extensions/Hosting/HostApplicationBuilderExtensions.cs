@@ -32,7 +32,7 @@ public static class HostApplicationBuilderExtensions {
 		var registrarName = typeof(TRegistrar).Name;
 		var deferredLogger = Logger.CreateDeferredLogger();
 
-		using (var loggingScope = deferredLogger.BeginScope($"Registrar '{registrarName}'")) {
+		using (var loggingScope = deferredLogger.BeginScope(new { RegistrarName = registrarName })) {
 
 			// Check if this specific registrar type is already registered
 			if (builder.Services.IsMarkerTypeRegistered<TRegistrar>()) {
